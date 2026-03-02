@@ -13,7 +13,7 @@ services:
       - handbook_library_pgdata:/var/lib/postgresql/data
       - ./config/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U alan_watts"]
+      test: ["CMD-SHELL", "pg_isready -U handbook_library"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,22 +25,21 @@ services:
     ports:
       - "127.0.0.1:8140:8000"
     environment:
-      DATABASE_URL: postgresql://alan_watts:${HANDBOOK_LIBRARY_DB_PASSWORD}@db:5432/handbook_library
+      DATABASE_URL: postgresql://handbook_library:${HANDBOOK_LIBRARY_DB_PASSWORD}@db:5432/handbook_library
       PYTHONPATH: /app
-      # LLM provider for chat (anthropic | openai | ollama | gemini | openrouter)
-      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
-      LLM_MODEL: ${LLM_MODEL:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_BASE_URL: ${LLM_BASE_URL:-}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      # Legacy: used by bulk embedding pipeline
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LLM_PROVIDER: openai
+      LLM_MODEL: auto
+      LLM_API_KEY: "free"
+      LLM_BASE_URL: "http://free_llm_api:8000/v1"
+    networks:
+      - default
+      - hercules_platform
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - ./src:/app/src
+      - ./config:/app/config
       - ./data:/app/data
 
   frontend:
@@ -50,9 +49,19 @@ services:
     ports:
       - "127.0.0.1:3140:3000"
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8131}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8140}
     depends_on:
       - api
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.200.0.0/24
+  hercules_platform:
+    external: true
+    name: hercules-platform_default
 
 volumes:
   handbook_library_pgdata:

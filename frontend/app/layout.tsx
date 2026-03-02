@@ -3,9 +3,8 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "Alan Watts Library",
-  description:
-    "238 transcripts, 1.7M words — the complete vectorized mind of Alan Watts",
+  title: "Handbook Library",
+  description: "Multi-library RAG platform — upload documents, search semantically, chat with AI",
 };
 
 export default function RootLayout({

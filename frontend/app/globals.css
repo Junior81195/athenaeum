@@ -3,17 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --bg: #181513;
-  --surface: #222018;
-  --surface-2: #2a2722;
-  --border: #3a3630;
-  --border-hover: rgba(217, 119, 6, 0.45);
-  --text: #ede9e6;
-  --muted: #8c857f;
-  --muted-2: #6b645e;
-  --accent: #d97706;
-  --accent-dim: rgba(217, 119, 6, 0.12);
-  --accent-glow: rgba(217, 119, 6, 0.06);
+  --bg: #131518;
+  --surface: #1a1d22;
+  --surface-2: #22262a;
+  --border: #303640;
+  --border-hover: rgba(99, 162, 255, 0.45);
+  --text: #e6e9ed;
+  --muted: #7f8c9a;
+  --muted-2: #5e6b7a;
+  --accent: #63a2ff;
+  --accent-dim: rgba(99, 162, 255, 0.12);
+  --accent-glow: rgba(99, 162, 255, 0.06);
   --radius: 10px;
 }
 
@@ -54,7 +54,7 @@ body {
   }
   .card-hover:hover {
     border-color: var(--border-hover);
-    box-shadow: 0 0 0 1px rgba(217,119,6,0.07), 0 6px 20px rgba(0,0,0,0.35);
+    box-shadow: 0 0 0 1px rgba(99,162,255,0.07), 0 6px 20px rgba(0,0,0,0.35);
   }
 
   .btn {
@@ -76,7 +76,7 @@ body {
 
   .btn-primary {
     background: var(--accent);
-    color: #1a1210;
+    color: #0a0e14;
   }
   .btn-primary:hover:not(:disabled) { opacity: 0.88; }
 
@@ -111,8 +111,8 @@ body {
   }
   .input::placeholder { color: var(--muted-2); }
   .input:focus {
-    border-color: rgba(217,119,6,0.4);
-    box-shadow: 0 0 0 3px rgba(217,119,6,0.07);
+    border-color: rgba(99,162,255,0.4);
+    box-shadow: 0 0 0 3px rgba(99,162,255,0.07);
   }
   .input[type="password"] { letter-spacing: 0.1em; }
   .input[type="password"]::placeholder { letter-spacing: normal; }
@@ -126,7 +126,7 @@ body {
     border-radius: 999px;
     background: var(--accent-dim);
     color: var(--accent);
-    border: 1px solid rgba(217,119,6,0.18);
+    border: 1px solid rgba(99,162,255,0.18);
     white-space: nowrap;
   }
 
@@ -191,16 +191,16 @@ body {
 /* ── Chat glow button ─────────────────────── */
 @keyframes glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(217,119,6,0.35), 0 0 20px rgba(217,119,6,0.12);
+    box-shadow: 0 0 8px rgba(99,162,255,0.35), 0 0 20px rgba(99,162,255,0.12);
   }
   50% {
-    box-shadow: 0 0 16px rgba(217,119,6,0.55), 0 0 36px rgba(217,119,6,0.22);
+    box-shadow: 0 0 16px rgba(99,162,255,0.55), 0 0 36px rgba(99,162,255,0.22);
   }
 }
 .btn-glow {
   background: var(--accent-dim);
   color: var(--accent);
-  border: 1px solid rgba(217,119,6,0.35);
+  border: 1px solid rgba(99,162,255,0.35);
   border-radius: 999px;
   padding: 0.5rem 1.25rem;
   font-size: 0.875rem;
@@ -214,10 +214,10 @@ body {
   transition: background 0.15s, transform 0.15s;
 }
 .btn-glow:hover {
-  background: rgba(217,119,6,0.2);
+  background: rgba(99,162,255,0.2);
   transform: translateY(-1px);
   animation: none;
-  box-shadow: 0 0 20px rgba(217,119,6,0.6), 0 0 40px rgba(217,119,6,0.25);
+  box-shadow: 0 0 20px rgba(99,162,255,0.6), 0 0 40px rgba(99,162,255,0.25);
 }
 
 /* ── Nav active state ─────────────────────── */

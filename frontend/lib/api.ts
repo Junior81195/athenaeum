@@ -1,17 +1,26 @@
-import { loadSettings } from "./settings";
-
-// Use relative URL so the browser calls /api/* on the same origin (nginx routes it to the backend).
-// NEXT_PUBLIC_API_URL can override for local dev pointing at a separate host.
 const API_URL =
   (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface Library {
+  id: number;
+  slug: string;
+  name: string;
+  description: string | null;
+  owner: string | null;
+  config: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  document_count: number;
+  chunk_count: number;
+}
+
 export interface SearchResult {
   chunk_id: number;
-  transcript_id: number;
-  transcript_title: string;
-  series: string | null;
+  document_id: number;
+  document_title: string;
+  section: string | null;
   text: string;
   similarity: number;
 }
@@ -24,7 +33,7 @@ export interface SearchResponse {
 
 export interface ChatSource {
   title: string;
-  series: string | null;
+  section: string | null;
   similarity: number;
 }
 
@@ -33,63 +42,49 @@ export interface ChatResponse {
   sources: ChatSource[];
 }
 
-export interface TranscriptSummary {
+export interface DocumentSummary {
   id: number;
   title: string;
-  series: string | null;
-  source: string;
+  section: string | null;
+  source: string | null;
   word_count: number;
 }
 
-export interface TranscriptDetail extends TranscriptSummary {
+export interface DocumentDetail extends DocumentSummary {
   full_text: string;
-  source_url: string | null;
-  video_url: string | null;
-}
-
-export interface SeriesInfo {
-  series: string;
-  count: number;
+  page_start: number | null;
+  page_end: number | null;
 }
 
 export interface TopicSummary {
   id: number;
   name: string;
   chunk_count: number;
-  transcript_count: number;
+  document_count: number;
   keywords: string[];
-}
-
-export interface TopicDetail extends TopicSummary {
-  transcripts: TranscriptSummary[];
 }
 
 export interface LibraryInfo {
   library: {
+    id: number;
+    slug: string;
     name: string;
-    title: string;
-    author: string;
-    domain: string;
-    description: string;
+    description: string | null;
   };
   corpus: {
-    transcript_count: number;
+    document_count: number;
     chunk_count: number;
     topic_count: number;
-    series_count: number;
+    section_count: number;
   };
-  frontend: {
-    suggestions: string[];
-    heroTagline: string;
-    accentColor: string;
-  };
+  config: Record<string, any>;
 }
 
-export interface ServerSettings {
-  provider: string;
-  model: string;
-  has_api_key: boolean;
-  base_url: string | null;
+export interface UploadResponse {
+  filename: string;
+  sections_created: number;
+  chunks_created: number;
+  chunks_embedded: number;
 }
 
 // ── API client ────────────────────────────────────────────────────────────────
@@ -112,63 +107,92 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  search: (q: string, limit = 10): Promise<SearchResponse> =>
-    apiFetch(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  // ── Libraries ──────────────────────────────────────────────
 
-  chat: (message: string, contextLimit = 10): Promise<ChatResponse> => {
-    const s = loadSettings();
-    return apiFetch("/api/chat", {
+  libraries: (): Promise<Library[]> => apiFetch("/api/libraries"),
+
+  createLibrary: (data: {
+    name: string;
+    slug: string;
+    description?: string;
+    config?: Record<string, any>;
+  }): Promise<Library> =>
+    apiFetch("/api/libraries", {
       method: "POST",
-      body: JSON.stringify({
-        message,
-        context_limit: contextLimit,
-        ...(s
-          ? {
-              llm_provider: s.provider,
-              llm_model: s.model || undefined,
-              llm_api_key: s.apiKey || undefined,
-              llm_base_url: s.baseUrl || undefined,
-            }
-          : {}),
-      }),
-    });
-  },
+      body: JSON.stringify(data),
+    }),
 
-  transcripts: (params?: {
-    series?: string;
-    search?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<TranscriptSummary[]> => {
+  library: (id: number): Promise<Library> =>
+    apiFetch(`/api/libraries/${id}`),
+
+  libraryBySlug: (slug: string): Promise<Library> =>
+    apiFetch(`/api/libraries/by-slug/${slug}`),
+
+  updateLibrary: (
+    id: number,
+    data: { name?: string; description?: string; config?: Record<string, any> }
+  ): Promise<Library> =>
+    apiFetch(`/api/libraries/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteLibrary: (id: number): Promise<void> =>
+    apiFetch(`/api/libraries/${id}`, { method: "DELETE" }),
+
+  // ── Library-scoped endpoints ───────────────────────────────
+
+  libraryInfo: (id: number): Promise<LibraryInfo> =>
+    apiFetch(`/api/libraries/${id}/info`),
+
+  search: (libraryId: number, q: string, limit = 10): Promise<SearchResponse> =>
+    apiFetch(
+      `/api/libraries/${libraryId}/search?q=${encodeURIComponent(q)}&limit=${limit}`
+    ),
+
+  chat: (
+    libraryId: number,
+    message: string,
+    contextLimit = 10
+  ): Promise<ChatResponse> =>
+    apiFetch(`/api/libraries/${libraryId}/chat`, {
+      method: "POST",
+      body: JSON.stringify({ message, context_limit: contextLimit }),
+    }),
+
+  documents: (
+    libraryId: number,
+    params?: { search?: string; limit?: number; offset?: number }
+  ): Promise<DocumentSummary[]> => {
     const qs = new URLSearchParams();
-    if (params?.series) qs.set("series", params.series);
     if (params?.search) qs.set("search", params.search);
     if (params?.limit !== undefined) qs.set("limit", String(params.limit));
     if (params?.offset !== undefined) qs.set("offset", String(params.offset));
-    return apiFetch(`/api/transcripts?${qs}`);
+    return apiFetch(`/api/libraries/${libraryId}/documents?${qs}`);
   },
 
-  transcript: (id: number): Promise<TranscriptDetail> =>
-    apiFetch(`/api/transcripts/${id}`),
+  document: (libraryId: number, docId: number): Promise<DocumentDetail> =>
+    apiFetch(`/api/libraries/${libraryId}/documents/${docId}`),
 
-  series: (): Promise<SeriesInfo[]> => apiFetch("/api/series"),
+  topics: (libraryId: number): Promise<TopicSummary[]> =>
+    apiFetch(`/api/libraries/${libraryId}/topics`),
 
-  topics: (): Promise<TopicSummary[]> => apiFetch("/api/topics"),
-
-  topic: (id: number): Promise<TopicDetail> => apiFetch(`/api/topics/${id}`),
-
-  info: (): Promise<LibraryInfo> => apiFetch("/api/info"),
-
-  serverSettings: (): Promise<ServerSettings> => apiFetch("/api/settings"),
-
-  testConnection: (payload: {
-    provider: string;
-    model?: string;
-    api_key?: string;
-    base_url?: string;
-  }): Promise<{ ok: boolean; response?: string }> =>
-    apiFetch("/api/settings/test", {
+  upload: async (libraryId: number, file: File): Promise<UploadResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_URL}/api/libraries/${libraryId}/upload`, {
       method: "POST",
-      body: JSON.stringify(payload),
-    }),
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      let detail = body;
+      try {
+        const parsed = JSON.parse(body);
+        detail = parsed.detail ?? body;
+      } catch {}
+      throw new Error(detail || `Upload error ${res.status}`);
+    }
+    return res.json() as Promise<UploadResponse>;
+  },
 };
