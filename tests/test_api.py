@@ -8,7 +8,7 @@ import pytest
 import httpx
 
 
-BASE = "http://127.0.0.1:8131"
+BASE = "http://127.0.0.1:8140"
 
 
 # ── Health ──────────────────────────────────────────────────────────────
@@ -19,77 +19,53 @@ def test_health():
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "healthy"
-    assert body["service"] == "alan-watts-library"
+    assert body["service"] == "athenaeum"
 
 
-# ── Search ──────────────────────────────────────────────────────────────
+# ── Libraries ───────────────────────────────────────────────────────────
 
 
-def test_search_returns_results():
-    r = httpx.get(f"{BASE}/api/search", params={"q": "ego", "limit": 5})
-    assert r.status_code == 200
-    body = r.json()
-    assert "results" in body
-    assert len(body["results"]) > 0
-
-
-def test_search_result_shape():
-    r = httpx.get(f"{BASE}/api/search", params={"q": "wu wei", "limit": 3})
-    result = r.json()["results"][0]
-    assert "chunk_id" in result
-    assert "transcript_title" in result
-    assert "text" in result
-    assert 0.0 <= result["similarity"] <= 1.0
-
-
-def test_search_empty_query():
-    r = httpx.get(f"{BASE}/api/search", params={"q": "", "limit": 5})
-    # Should return 422 or empty results — not 500
-    assert r.status_code in (200, 422)
-
-
-# ── Browse ──────────────────────────────────────────────────────────────
-
-
-def test_transcripts_list():
-    r = httpx.get(f"{BASE}/api/transcripts")
-    assert r.status_code == 200
-    body = r.json()
-    assert "transcripts" in body
-    assert len(body["transcripts"]) >= 100
-
-
-def test_transcripts_filter_by_series():
-    r = httpx.get(f"{BASE}/api/transcripts", params={"series": "Tao"})
-    assert r.status_code == 200
-
-
-def test_transcript_detail():
-    r = httpx.get(f"{BASE}/api/transcripts/1")
-    assert r.status_code == 200
-    body = r.json()
-    assert "title" in body
-    assert "full_text" in body
-
-
-def test_series_list():
-    r = httpx.get(f"{BASE}/api/series")
+def test_list_libraries():
+    r = httpx.get(f"{BASE}/api/libraries")
     assert r.status_code == 200
     assert isinstance(r.json(), list)
 
 
-def test_topics_list():
-    r = httpx.get(f"{BASE}/api/topics")
+def test_create_and_delete_library():
+    # Create
+    r = httpx.post(f"{BASE}/api/libraries", json={
+        "name": "Test Library",
+        "slug": "test-lib",
+        "description": "For testing",
+    })
+    assert r.status_code == 201
+    lib = r.json()
+    assert lib["slug"] == "test-lib"
+    lib_id = lib["id"]
+
+    # Get by slug
+    r = httpx.get(f"{BASE}/api/libraries/by-slug/test-lib")
     assert r.status_code == 200
-    topics = r.json()
-    assert len(topics) == 15
+    assert r.json()["id"] == lib_id
+
+    # Delete
+    r = httpx.delete(f"{BASE}/api/libraries/{lib_id}")
+    assert r.status_code == 204
 
 
-def test_topic_detail():
-    r = httpx.get(f"{BASE}/api/topics/1")
-    assert r.status_code == 200
-    body = r.json()
-    assert "name" in body
+def test_create_duplicate_slug():
+    httpx.post(f"{BASE}/api/libraries", json={
+        "name": "Dup Test", "slug": "dup-test",
+    })
+    r = httpx.post(f"{BASE}/api/libraries", json={
+        "name": "Dup Test 2", "slug": "dup-test",
+    })
+    assert r.status_code == 409
+    # cleanup
+    libs = httpx.get(f"{BASE}/api/libraries").json()
+    for lib in libs:
+        if lib["slug"] == "dup-test":
+            httpx.delete(f"{BASE}/api/libraries/{lib['id']}")
 
 
 # ── Settings ────────────────────────────────────────────────────────────

@@ -130,8 +130,8 @@ class OpenRouterProvider(LLMProvider):
             api_key=self._api_key,
             base_url=self.OPENROUTER_BASE,
             default_headers={
-                "HTTP-Referer": "https://alanwatts.herakles.dev",
-                "X-Title": "Alan Watts Library",
+                "HTTP-Referer": "https://athenaeum.herakles.dev",
+                "X-Title": "Athenaeum",
             },
         )
 

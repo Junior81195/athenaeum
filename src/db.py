@@ -5,5 +5,5 @@ from config.settings import DATABASE_URL
 
 
 def get_connection():
-    """Return a new psycopg2 connection to the alan_watts database."""
+    """Return a new psycopg2 connection to the athenaeum database."""
     return psycopg2.connect(DATABASE_URL)

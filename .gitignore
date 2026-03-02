@@ -1,6 +1,3 @@
-data/github-can-sahin/
-data/github-chaosinside/
-data/audio/
 __pycache__/
 *.pyc
 .env
@@ -11,3 +8,4 @@ node_modules/
 frontend/.next/
 frontend/out/
 .DS_Store
+data/*/
