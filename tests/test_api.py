@@ -415,6 +415,152 @@ class TestSettings:
 
 # ── User ────────────────────────────────────────────────────────────────────
 
+class TestMultiLibrary:
+    """Tests for cross-library search and chat."""
+
+    @pytest.fixture(scope="class")
+    def second_library(self):
+        """Create a second test library with different content."""
+        slug = f"test-lib2-{int(time.time())}"
+        r = client.post("/api/libraries", json={
+            "name": "Second Test Library",
+            "slug": slug,
+            "description": "Second library for multi-library tests",
+            "visibility": "public",
+        })
+        assert r.status_code == 201, f"Failed to create second library: {r.text}"
+        lib = r.json()
+
+        # Upload different content
+        content = """# Workplace Safety Guide
+
+## OSHA Requirements
+The Occupational Safety and Health Administration (OSHA) requires employers to provide
+a safe and healthful workplace. Employers must comply with OSHA standards and regulations.
+
+## Hazard Communication
+Employers must inform workers about chemical hazards through labels, safety data sheets,
+and training. The Hazard Communication Standard is one of OSHA's most cited standards.
+
+## Personal Protective Equipment
+Employers must provide personal protective equipment (PPE) to workers when engineering
+controls are not sufficient to reduce hazards. PPE includes hard hats, gloves, and goggles.
+"""
+        files = {"file": ("test-safety.txt", content.encode(), "text/plain")}
+        r = client.post(f"/api/libraries/{lib['id']}/upload", files=files)
+        assert r.status_code == 200, f"Upload to second library failed: {r.text}"
+
+        yield lib
+        client.delete(f"/api/libraries/{lib['id']}")
+
+    def test_multi_search(self, test_library, uploaded_doc, second_library):
+        r = client.post("/api/search", json={
+            "query": "workplace requirements",
+            "library_ids": [test_library["id"], second_library["id"]],
+        })
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["results"]) > 0
+        # Results should have library attribution
+        for result in data["results"]:
+            assert "library_id" in result
+            assert "library_name" in result
+            assert "library_slug" in result
+
+    def test_multi_search_structure(self, test_library, uploaded_doc, second_library):
+        r = client.post("/api/search", json={
+            "query": "safety",
+            "library_ids": [test_library["id"], second_library["id"]],
+            "limit": 5,
+        })
+        data = r.json()
+        assert "query" in data
+        assert "results" in data
+        assert "total" in data
+        if data["results"]:
+            result = data["results"][0]
+            assert "chunk_id" in result
+            assert "document_id" in result
+            assert "document_title" in result
+            assert "text" in result
+            assert "similarity" in result
+            assert 0 <= result["similarity"] <= 1
+            assert "library_id" in result
+            assert "library_name" in result
+            assert "library_slug" in result
+
+    def test_multi_search_empty_ids(self):
+        r = client.post("/api/search", json={
+            "query": "test", "library_ids": [],
+        })
+        assert r.status_code == 400
+
+    def test_multi_search_nonexistent_library(self, test_library, uploaded_doc):
+        r = client.post("/api/search", json={
+            "query": "test", "library_ids": [test_library["id"], 99999],
+        })
+        assert r.status_code == 404
+
+    def test_multi_chat(self, test_library, uploaded_doc, second_library):
+        r = client.post("/api/chat", json={
+            "message": "What are the workplace requirements?",
+            "library_ids": [test_library["id"], second_library["id"]],
+        })
+        assert r.status_code == 200
+        data = r.json()
+        assert "answer" in data
+        assert "sources" in data
+        assert "suggestions" in data
+        assert "conversation_id" in data
+        assert len(data["answer"]) > 0
+        assert len(data["sources"]) > 0
+
+    def test_multi_chat_conversation_persistence(self, test_library, uploaded_doc, second_library):
+        lib_ids = [test_library["id"], second_library["id"]]
+        r1 = client.post("/api/chat", json={
+            "message": "Tell me about safety",
+            "library_ids": lib_ids,
+        })
+        data1 = r1.json()
+        conv_id = data1["conversation_id"]
+        assert conv_id
+
+        r2 = client.post("/api/chat", json={
+            "message": "What about PPE specifically?",
+            "library_ids": lib_ids,
+            "conversation_id": conv_id,
+        })
+        data2 = r2.json()
+        assert data2["conversation_id"] == conv_id
+
+        # Verify conversation is listed in multi-library conversations
+        r3 = client.get("/api/conversations")
+        assert r3.status_code == 200
+        convs = r3.json()
+        conv_ids = [c["id"] for c in convs]
+        assert conv_id in conv_ids
+
+        # Cleanup
+        client.delete(f"/api/conversations/{conv_id}")
+
+    def test_multi_chat_sources_have_library(self, test_library, uploaded_doc, second_library):
+        r = client.post("/api/chat", json={
+            "message": "Compare employment law with workplace safety",
+            "library_ids": [test_library["id"], second_library["id"]],
+        })
+        data = r.json()
+        for source in data["sources"]:
+            assert "library_id" in source
+            assert "library_name" in source
+            assert "library_slug" in source
+
+    def test_multi_chat_empty_ids(self):
+        r = client.post("/api/chat", json={
+            "message": "test", "library_ids": [],
+        })
+        assert r.status_code == 400
+
+
 class TestUser:
     def test_me_authenticated(self):
         r = client.get("/api/me")

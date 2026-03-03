@@ -35,7 +35,7 @@ export default function Nav() {
         className="font-semibold text-sm tracking-tight mr-5 shrink-0 flex items-center gap-2"
         style={{ color: "var(--accent)" }}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
         </svg>
@@ -46,9 +46,15 @@ export default function Nav() {
       <div className="w-px h-4 mr-3" style={{ background: "var(--border)" }} />
 
       {/* Nav links */}
-      <nav className="flex items-stretch h-full text-xs gap-0.5 overflow-x-auto scrollbar-none">
+      <nav aria-label="Main navigation" className="flex items-stretch h-full text-xs gap-0.5 overflow-x-auto scrollbar-none">
         <NavLink href="/" active={!librarySlug && path === "/"}>
           Libraries
+        </NavLink>
+        <NavLink href="/search" active={isActive("/search")}>
+          Search
+        </NavLink>
+        <NavLink href="/chat" active={!librarySlug && isActive("/chat")}>
+          Chat
         </NavLink>
 
         {librarySlug && (

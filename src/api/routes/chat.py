@@ -75,7 +75,8 @@ class MessageDetail(BaseModel):
 
 class ConversationDetail(BaseModel):
     id: str
-    library_id: int
+    library_id: int | None
+    library_ids: list[int] = []
     title: str | None
     created_at: str
     messages: list[MessageDetail]
@@ -387,6 +388,15 @@ def get_conversation(conversation_id: str, request: Request):
             if not conv:
                 raise HTTPException(status_code=404, detail="Conversation not found")
 
+            # For multi-library conversations, fetch from join table
+            library_ids = []
+            if conv["library_id"] is None:
+                cur.execute("""
+                    SELECT library_id FROM conversation_libraries
+                    WHERE conversation_id = %s ORDER BY library_id
+                """, (conversation_id,))
+                library_ids = [row["library_id"] for row in cur.fetchall()]
+
             cur.execute("""
                 SELECT id, role, content, sources_json, created_at
                 FROM messages
@@ -400,6 +410,7 @@ def get_conversation(conversation_id: str, request: Request):
     return ConversationDetail(
         id=str(conv["id"]),
         library_id=conv["library_id"],
+        library_ids=library_ids,
         title=conv["title"],
         created_at=str(conv["created_at"]),
         messages=[

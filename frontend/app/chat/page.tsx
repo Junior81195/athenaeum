@@ -1,30 +1,26 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
 import {
   api,
-  type Library,
-  type SourceDetail,
-  type ChatResponse,
+  type MultiSourceDetail,
+  type MultiChatResponse,
   type ConversationSummary,
 } from "@/lib/api";
 import { useKeyboard } from "@/lib/useKeyboard";
+import LibrarySelector from "@/components/LibrarySelector";
 import RenderedAnswer from "@/components/RenderedAnswer";
 import SourceCard from "@/components/SourceCard";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
-  sources?: SourceDetail[];
+  sources?: MultiSourceDetail[];
   suggestions?: string[];
 }
 
-export default function LibraryChatPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-
-  const [library, setLibrary] = useState<Library | null>(null);
+export default function MultiChatPage() {
+  const [selectedLibs, setSelectedLibs] = useState<number[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,18 +32,15 @@ export default function LibraryChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const keyHandlers = useMemo(() => ({
-    "n": () => { setMessages([]); setConversationId(null); setExpandedSources({}); setShowHistory(false); setTimeout(() => inputRef.current?.focus(), 50); },
+    "n": () => startNewConversation(),
     "Escape": () => { if (showHistory) setShowHistory(false); },
     "/": () => inputRef.current?.focus(),
   }), [showHistory]);
   useKeyboard(keyHandlers);
 
   useEffect(() => {
-    api.libraryBySlug(slug).then((lib) => {
-      setLibrary(lib);
-      api.conversations(lib.id).then(setConversations).catch(() => {});
-    });
-  }, [slug]);
+    api.multiConversations().then(setConversations).catch(() => {});
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -61,11 +54,14 @@ export default function LibraryChatPage() {
     try {
       const detail = await api.conversation(convId);
       setConversationId(convId);
+      if (detail.library_ids.length > 0) {
+        setSelectedLibs(detail.library_ids);
+      }
       setMessages(
         detail.messages.map((m) => ({
           role: m.role as "user" | "assistant",
           content: m.content,
-          sources: m.sources_json ?? undefined,
+          sources: m.sources_json as MultiSourceDetail[] | undefined ?? undefined,
         }))
       );
       setShowHistory(false);
@@ -82,7 +78,7 @@ export default function LibraryChatPage() {
 
   async function sendMessage(text?: string) {
     const msg = (text ?? input).trim();
-    if (!msg || loading || !library) return;
+    if (!msg || loading || selectedLibs.length === 0) return;
 
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: msg }]);
@@ -90,9 +86,9 @@ export default function LibraryChatPage() {
     setExpandedSources({});
 
     try {
-      const data: ChatResponse = await api.chat(
-        library.id,
+      const data: MultiChatResponse = await api.multiChat(
         msg,
+        selectedLibs,
         8,
         conversationId ?? undefined
       );
@@ -106,8 +102,7 @@ export default function LibraryChatPage() {
           suggestions: data.suggestions,
         },
       ]);
-      // Refresh conversation list
-      api.conversations(library.id).then(setConversations).catch(() => {});
+      api.multiConversations().then(setConversations).catch(() => {});
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : "Something went wrong";
       setMessages((prev) => [
@@ -127,21 +122,13 @@ export default function LibraryChatPage() {
     }
   }
 
-  const suggestions = library?.config?.frontend?.suggestions || [
-    "What does this document cover?",
-    "Summarize the key policies",
-    "What are the main sections?",
-  ];
-
   return (
     <div>
       <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">
-            {library ? `Chat — ${library.name}` : "Loading..."}
-          </h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Chat Across Libraries</h1>
           <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--muted)" }}>
-            Research-grade AI answers with source citations
+            AI answers grounded in multiple libraries with cross-library citations
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -166,8 +153,13 @@ export default function LibraryChatPage() {
         </div>
       </div>
 
-      <div className="flex gap-4 relative" style={{ height: "calc(100vh - 12rem)" }}>
-        {/* Conversation history sidebar — overlay on mobile, inline on desktop */}
+      {/* Library selector — compact at top */}
+      <div className="max-w-xl mb-5">
+        <LibrarySelector selected={selectedLibs} onChange={setSelectedLibs} />
+      </div>
+
+      <div className="flex gap-4 relative" style={{ height: "calc(100vh - 18rem)" }}>
+        {/* Conversation history sidebar */}
         {showHistory && (
           <>
             <div
@@ -184,40 +176,39 @@ export default function LibraryChatPage() {
               className="fixed left-0 top-12 bottom-0 w-64 z-40 md:relative md:top-auto md:bottom-auto md:w-56 shrink-0 rounded-none md:rounded-xl border-r md:border flex flex-col overflow-hidden animate-in"
               style={{ background: "var(--surface)", borderColor: "var(--border)" }}
             >
-            <div className="p-3 border-b" style={{ borderColor: "var(--border)" }}>
-              <p className="section-label text-xs">Conversations</p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {conversations.length === 0 ? (
-                <p className="text-xs p-2" style={{ color: "var(--muted-2)" }}>No conversations yet</p>
-              ) : (
-                conversations.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => loadConversation(c.id)}
-                    className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors"
-                    style={{
-                      background: c.id === conversationId ? "var(--accent-dim)" : "transparent",
-                      color: c.id === conversationId ? "var(--accent)" : "var(--muted)",
-                    }}
-                  >
-                    <p className="truncate font-medium" style={{ color: c.id === conversationId ? "var(--text)" : undefined }}>
-                      {c.title || "Untitled"}
-                    </p>
-                    <p className="text-[10px] mt-0.5" style={{ color: "var(--muted-2)" }}>
-                      {c.message_count} messages
-                    </p>
-                  </button>
-                ))
-              )}
-            </div>
-          </aside>
+              <div className="p-3 border-b" style={{ borderColor: "var(--border)" }}>
+                <p className="section-label text-xs">Conversations</p>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {conversations.length === 0 ? (
+                  <p className="text-xs p-2" style={{ color: "var(--muted-2)" }}>No conversations yet</p>
+                ) : (
+                  conversations.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => loadConversation(c.id)}
+                      className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors"
+                      style={{
+                        background: c.id === conversationId ? "var(--accent-dim)" : "transparent",
+                        color: c.id === conversationId ? "var(--accent)" : "var(--muted)",
+                      }}
+                    >
+                      <p className="truncate font-medium" style={{ color: c.id === conversationId ? "var(--text)" : undefined }}>
+                        {c.title || "Untitled"}
+                      </p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "var(--muted-2)" }}>
+                        {c.message_count} messages
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </aside>
           </>
         )}
 
         {/* Main chat area */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto space-y-5 pr-1">
             {messages.length === 0 && (
               <div className="py-10 text-center animate-in">
@@ -233,23 +224,15 @@ export default function LibraryChatPage() {
                   AI
                 </div>
                 <p className="text-xl font-light mb-1" style={{ color: "var(--text)" }}>
-                  Ask anything about this library.
+                  {selectedLibs.length === 0
+                    ? "Select libraries and ask a question."
+                    : `Ask anything across ${selectedLibs.length} ${selectedLibs.length === 1 ? "library" : "libraries"}.`}
                 </p>
                 <p className="text-sm mb-7" style={{ color: "var(--muted)" }}>
-                  {library ? `${library.document_count} documents, ${library.chunk_count} indexed chunks` : ""}
+                  {selectedLibs.length === 0
+                    ? "Choose one or more libraries above to get started"
+                    : "Cross-library search with per-library attribution"}
                 </p>
-                <div className="flex flex-col items-center gap-2">
-                  {suggestions.map((s: string) => (
-                    <button
-                      key={s}
-                      onClick={() => sendMessage(s)}
-                      className="suggestion-chip text-sm px-4 py-2 rounded-full"
-                      style={{ background: "var(--surface)" }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -278,7 +261,6 @@ export default function LibraryChatPage() {
                       AI
                     </div>
                     <div className="flex-1 min-w-0 max-w-3xl">
-                      {/* Answer with rendered citations */}
                       <div
                         className="rounded-2xl rounded-bl px-4 py-3 text-sm leading-relaxed"
                         style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
@@ -286,7 +268,6 @@ export default function LibraryChatPage() {
                         <RenderedAnswer text={m.content} onCiteClick={toggleSource} />
                       </div>
 
-                      {/* Source cards */}
                       {m.sources && m.sources.length > 0 && (
                         <div className="mt-2 space-y-1.5">
                           <p className="text-[11px] font-medium uppercase tracking-wider px-1" style={{ color: "var(--muted-2)" }}>
@@ -298,12 +279,12 @@ export default function LibraryChatPage() {
                               source={s}
                               expanded={!!expandedSources[s.index]}
                               onToggle={() => toggleSource(s.index)}
+                              libraryName={s.library_name}
                             />
                           ))}
                         </div>
                       )}
 
-                      {/* Follow-up suggestions */}
                       {m.suggestions && m.suggestions.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {m.suggestions.map((s, j) => (
@@ -345,8 +326,8 @@ export default function LibraryChatPage() {
                   style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
                 >
                   <div className="flex gap-1.5 items-center">
-                    <div className="text-xs" style={{ color: "var(--muted)" }}>Searching documents and generating response</div>
-                    <span className="dot-pulse" aria-hidden="true"><span /><span /><span /></span>
+                    <div className="text-xs" style={{ color: "var(--muted)" }}>Searching across libraries and generating response</div>
+                    <span className="dot-pulse"><span /><span /><span /></span>
                   </div>
                 </div>
               </div>
@@ -363,8 +344,12 @@ export default function LibraryChatPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask a question... (Enter to send)"
-                disabled={loading}
+                placeholder={
+                  selectedLibs.length === 0
+                    ? "Select libraries above to start chatting..."
+                    : "Ask a question... (Enter to send)"
+                }
+                disabled={loading || selectedLibs.length === 0}
                 rows={1}
                 className="input flex-1 resize-none"
                 style={{ minHeight: "2.75rem", maxHeight: "8rem", lineHeight: "1.5" }}
@@ -376,7 +361,7 @@ export default function LibraryChatPage() {
               />
               <button
                 onClick={() => sendMessage()}
-                disabled={loading || !input.trim()}
+                disabled={loading || !input.trim() || selectedLibs.length === 0}
                 className="btn btn-primary shrink-0"
                 style={{ height: "2.75rem", padding: "0 1.25rem" }}
               >
@@ -398,5 +383,3 @@ export default function LibraryChatPage() {
     </div>
   );
 }
-
-

@@ -77,10 +77,36 @@ export interface MessageDetail {
 
 export interface ConversationDetail {
   id: string;
-  library_id: number;
+  library_id: number | null;
+  library_ids: number[];
   title: string | null;
   created_at: string;
   messages: MessageDetail[];
+}
+
+export interface MultiSearchResult extends SearchResult {
+  library_id: number;
+  library_name: string;
+  library_slug: string;
+}
+
+export interface MultiSearchResponse {
+  query: string;
+  results: MultiSearchResult[];
+  total: number;
+}
+
+export interface MultiSourceDetail extends SourceDetail {
+  library_id: number;
+  library_name: string;
+  library_slug: string;
+}
+
+export interface MultiChatResponse {
+  answer: string;
+  sources: MultiSourceDetail[];
+  suggestions: string[];
+  conversation_id: string;
 }
 
 export interface DocumentSummary {
@@ -236,6 +262,39 @@ export const api = {
 
   topics: (libraryId: number): Promise<TopicSummary[]> =>
     apiFetch(`/api/libraries/${libraryId}/topics`),
+
+  // ── Multi-library endpoints ──────────────────────────────────
+
+  multiSearch: (
+    query: string,
+    libraryIds: number[],
+    limit = 20
+  ): Promise<MultiSearchResponse> =>
+    apiFetch("/api/search", {
+      method: "POST",
+      body: JSON.stringify({ query, library_ids: libraryIds, limit }),
+    }),
+
+  multiChat: (
+    message: string,
+    libraryIds: number[],
+    contextLimit = 10,
+    conversationId?: string
+  ): Promise<MultiChatResponse> =>
+    apiFetch("/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        message,
+        library_ids: libraryIds,
+        context_limit: contextLimit,
+        conversation_id: conversationId ?? null,
+      }),
+    }),
+
+  multiConversations: (): Promise<ConversationSummary[]> =>
+    apiFetch("/api/conversations"),
+
+  // ── Upload ──────────────────────────────────────────────────
 
   upload: async (libraryId: number, file: File): Promise<UploadResponse> => {
     const formData = new FormData();

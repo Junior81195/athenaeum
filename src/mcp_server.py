@@ -128,6 +128,54 @@ async def list_tools() -> list[Tool]:
                 "required": ["library_id", "document_id"],
             },
         ),
+        Tool(
+            name="athenaeum_multi_search",
+            description="Semantic search across multiple Athenaeum libraries at once. Returns results with per-library attribution.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "library_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Library IDs to search across (get from athenaeum_list_libraries)",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Natural language search query",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results (default 10)",
+                        "default": 10,
+                    },
+                },
+                "required": ["library_ids", "query"],
+            },
+        ),
+        Tool(
+            name="athenaeum_multi_chat",
+            description="Chat across multiple Athenaeum libraries using RAG. AI answers are grounded in content from all selected libraries with cross-library source citations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "library_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Library IDs to chat across",
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Question to ask across the libraries",
+                    },
+                    "context_limit": {
+                        "type": "integer",
+                        "description": "Number of source chunks to use (default 8)",
+                        "default": 8,
+                    },
+                },
+                "required": ["library_ids", "message"],
+            },
+        ),
     ]
 
 
@@ -225,6 +273,51 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             if doc.get("page_start"):
                 header += f"\nPages: {doc['page_start']}-{doc.get('page_end', doc['page_start'])}"
             return [TextContent(type="text", text=f"{header}\n\n{doc['full_text']}")]
+
+        elif name == "athenaeum_multi_search":
+            lib_ids = arguments["library_ids"]
+            query = arguments["query"]
+            limit = arguments.get("limit", 10)
+            data = _post("/api/search", {
+                "query": query, "library_ids": lib_ids, "limit": limit,
+            })
+            results = data.get("results", [])
+            lines = [f"Multi-search: \"{data.get('query', query)}\" across {len(lib_ids)} libraries — {len(results)} results\n"]
+            for r in results:
+                sim = round(r["similarity"] * 100, 1)
+                lines.append(f"[{sim}%] {r['document_title']}  [{r['library_name']}]")
+                if r.get("section"):
+                    lines.append(f"  Section: {r['section']}")
+                lines.append(f"  Doc ID: {r['document_id']} | Library: {r['library_slug']}")
+                lines.append(f"  {r['text'][:300]}...")
+                lines.append("")
+            return [TextContent(type="text", text="\n".join(lines))]
+
+        elif name == "athenaeum_multi_chat":
+            lib_ids = arguments["library_ids"]
+            message = arguments["message"]
+            context_limit = arguments.get("context_limit", 8)
+            data = _post("/api/chat", {
+                "message": message,
+                "library_ids": lib_ids,
+                "context_limit": context_limit,
+            })
+            parts = [data.get("answer", "No answer")]
+            sources = data.get("sources", [])
+            if sources:
+                parts.append("\n--- Sources ---")
+                for s in sources[:5]:
+                    sim = round(s["similarity"] * 100, 1)
+                    lib_label = f" [{s.get('library_name', '')}]" if s.get("library_name") else ""
+                    parts.append(f"[{s['index']}] {s['title']}{lib_label} ({sim}%)")
+                    if s.get("section"):
+                        parts.append(f"    Section: {s['section']}")
+            suggestions = data.get("suggestions", [])
+            if suggestions:
+                parts.append("\n--- Follow-up questions ---")
+                for i, q in enumerate(suggestions, 1):
+                    parts.append(f"{i}. {q}")
+            return [TextContent(type="text", text="\n".join(parts))]
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]

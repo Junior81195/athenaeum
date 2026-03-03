@@ -8,7 +8,7 @@ import sys
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import libraries, upload, search, chat, browse, settings, user
+from src.api.routes import libraries, upload, search, chat, browse, settings, user, multi
 
 
 # ── Structured JSON logging ──────────────────────────────────────────────────
@@ -95,6 +95,7 @@ app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(browse.router, prefix="/api", tags=["browse"])
 app.include_router(settings.router, prefix="/api", tags=["settings"])
 app.include_router(user.router, prefix="/api", tags=["user"])
+app.include_router(multi.router, prefix="/api", tags=["multi-library"])
 
 
 @app.get("/health")
