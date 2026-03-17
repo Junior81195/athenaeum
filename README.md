@@ -18,7 +18,7 @@ Named for the Temple of Athena — the classical word for a library or reading r
 ## Quick Start
 
 ```bash
-git clone https://github.com/HeraclesBass/athenaeum.git
+git clone https://github.com/herakles-dev/athenaeum.git
 cd athenaeum
 cp .env.example .env          # Edit: set ATHENAEUM_DB_PASSWORD and LLM provider
 make run                      # Starts PostgreSQL, API, and frontend
